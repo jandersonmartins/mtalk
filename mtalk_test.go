@@ -1,18 +1,21 @@
 package mtalk
 
 import (
+	"fmt"
 	"net"
 	"os"
+	"path"
 	"testing"
 	"time"
 )
 
+const (
+	TMP_DIR   = "tmp"
+	FILE_NAME = "foo.txt"
+)
+
 func TestMtalk(t *testing.T) {
-	f, err := os.Create("tmp/foo.txt")
-	if err != nil {
-		t.Fatal("foo.txt was not created")
-	}
-	f.Close()
+	setupFile(t)
 
 	go Listen(8081)
 
@@ -21,12 +24,34 @@ func TestMtalk(t *testing.T) {
 		t.Fatalf("conn error: %v", err)
 	}
 
-	conn.Write([]byte("cmd rm tmp/foo.txt \n"))
+	filePath := fooPath()
+	cmd := fmt.Sprintf("cmd rm %s \n", filePath)
+	conn.Write([]byte(cmd))
 	// see a better way to wait
 	time.Sleep(2 * time.Second)
 
-	_, err = os.Stat("tmp/foo.txt")
+	_, err = os.Stat(filePath)
 	if !os.IsNotExist(err) {
-		t.Errorf("foo.txt was not removed")
+		t.Errorf("%s was not removed", FILE_NAME)
 	}
+}
+
+func setupFile(t *testing.T) {
+	t.Helper()
+	_, err := os.Stat(TMP_DIR)
+	if os.IsNotExist(err) {
+		err := os.Mkdir(TMP_DIR, 0755)
+		if err != nil {
+			t.Fatalf("mkdir error: %v", err)
+		}
+	}
+	f, err := os.Create(fooPath())
+	if err != nil {
+		t.Fatalf("%s was not created", FILE_NAME)
+	}
+	f.Close()
+}
+
+func fooPath() string {
+	return path.Join(TMP_DIR, string(os.PathSeparator), FILE_NAME)
 }
